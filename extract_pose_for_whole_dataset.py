@@ -10,7 +10,7 @@ import argparse
 import matplotlib
 from torch import np
 import pylab as plt
-from joblib import Parallel, delayed
+# from joblib import Parallel, delayed
 import util
 import torch
 import torch as T
@@ -173,16 +173,21 @@ def may_make_dir(path):
     os.makedirs(path)
 
 #torch.nn.functional.pad(img pad, mode='constant', value=model_['padValue'])
-# TODO
+# TODO, image dir
 # test_image = './sample_image/ski.jpg'
 # test_image = os.path.expanduser('~/Dataset/market1501/images/00000001_0001_00000001.jpg')
 # test_image = os.path.expanduser('~/Dataset/market1501/images/00000100_0001_00000001.jpg')
-im_dir = os.path.expanduser('~/Dataset/market1501/images')
-save_dir = os.path.expanduser('~/Dataset/market1501/pose_images')
+# im_dir = os.path.expanduser('~/Dataset/market1501/images')
+# save_dir = os.path.expanduser('~/Dataset/market1501/pose_images')
+im_dir = os.path.expanduser('~/Dataset/duke/images')
+save_dir = os.path.expanduser('~/Dataset/duke/pose_images')
 may_make_dir(save_dir)
 test_images = get_im_names(im_dir, return_np=False, return_path=True)
 
-for test_image in test_images:
+st = time.time()
+for processed_im_ind, test_image in enumerate(test_images):
+    print('[{}/{}], {}, total {:.2f}s'
+          .format(processed_im_ind + 1, len(test_images), osp.basename(test_image), time.time() - st))
     oriImg = cv2.imread(test_image) # B,G,R order
     imageToTest = Variable(T.transpose(T.transpose(T.unsqueeze(torch.from_numpy(oriImg).float(),0),2,3),1,2),volatile=True).cuda()
 
@@ -207,8 +212,8 @@ for test_image in test_images:
 
         feed = Variable(T.from_numpy(imageToTest_padded)).cuda()
         output1,output2 = model(feed)
-        print output1.size()
-        print output2.size()
+        # print output1.size()
+        # print output2.size()
         heatmap = nn.UpsamplingBilinear2d((oriImg.shape[0], oriImg.shape[1])).cuda()(output2)
 
         paf = nn.UpsamplingBilinear2d((oriImg.shape[0], oriImg.shape[1])).cuda()(output1)
@@ -218,10 +223,8 @@ for test_image in test_images:
 
 
 
-    heatmap_avg = T.transpose(T.transpose(T.squeeze(T.mean(heatmap_avg, 0)),0,1),1,2).cuda()
-    paf_avg     = T.transpose(T.transpose(T.squeeze(T.mean(paf_avg, 0)),0,1),1,2).cuda()
-    heatmap_avg=heatmap_avg.cpu().numpy()
-    paf_avg    = paf_avg.cpu().numpy()
+    heatmap_avg = T.transpose(T.transpose(T.squeeze(T.mean(heatmap_avg, 0)),0,1),1,2).cpu().numpy()
+    paf_avg     = T.transpose(T.transpose(T.squeeze(T.mean(paf_avg, 0)),0,1),1,2).cpu().numpy()
 
     all_peaks = []
     peak_counter = 0
@@ -285,11 +288,16 @@ for test_image in test_images:
                                       for I in range(len(startend))])
 
                     score_midpts = np.multiply(vec_x, vec[0]) + np.multiply(vec_y, vec[1])
+
                     # MODIFIED.
-                    try:
-                        score_with_dist_prior = sum(score_midpts) / len(score_midpts) + min(0.5 * oriImg.shape[0] / norm - 1, 0)
-                    except:
-                        score_with_dist_prior = 0
+                    # This in fact does not happens often.
+                    if norm == 0:
+                        add = 0
+                        print('\tnorm == 0')
+                    else:
+                        add = min(0.5 * oriImg.shape[0] / norm - 1, 0)
+                    score_with_dist_prior = sum(score_midpts) / len(score_midpts) + add
+
                     criterion1 = len(np.nonzero(score_midpts > param_['thre2'])[0]) > 0.8 * len(score_midpts)
                     criterion2 = score_with_dist_prior > 0
                     if criterion1 and criterion2:
@@ -364,15 +372,15 @@ for test_image in test_images:
             deleteIdx.append(i)
     subset = np.delete(subset, deleteIdx, axis=0)
 
-    # TODO: replace by a black image
+    # MODIFIED: replace by a black image
     # canvas = cv2.imread(test_image) # B,G,R order
     canvas = np.zeros_like(oriImg, dtype=np.uint8)
     for i in range(18):
         for j in range(len(all_peaks[i])):
-            # TODO
+            # TODO, circle size
             cv2.circle(canvas, all_peaks[i][j][0:2], 4, colors[i], thickness=-1)
 
-    # TODO
+    # TODO, stick width
     stickwidth = 4
 
     for i in range(17):

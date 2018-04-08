@@ -177,12 +177,14 @@ def may_make_dir(path):
 # test_image = './sample_image/ski.jpg'
 # test_image = os.path.expanduser('~/Dataset/market1501/images/00000001_0001_00000001.jpg')
 # test_image = os.path.expanduser('~/Dataset/market1501/images/00000100_0001_00000001.jpg')
-im_dir = os.path.expanduser('~/Dataset/market1501/images')
-save_dir = './some_extracted_pose_images'
+# im_dir = os.path.expanduser('~/Dataset/market1501/images')
+# save_dir = './some_extracted_pose_images_market1501'
+im_dir = os.path.expanduser('~/Dataset/duke/images')
+save_dir = './some_extracted_pose_images_duke'
 may_make_dir(save_dir)
 test_images = get_im_names(im_dir, return_np=False, return_path=True)
 np.random.shuffle(test_images)
-test_images = test_images[:20]
+test_images = test_images[:40]
 
 for test_image in test_images:
     oriImg = cv2.imread(test_image) # B,G,R order
@@ -291,7 +293,7 @@ for test_image in test_images:
                     try:
                         score_with_dist_prior = sum(score_midpts)/len(score_midpts) + min(0.5*oriImg.shape[0]/norm-1, 0)
                     except:
-                        score_with_dist_prior = 0
+                        score_with_dist_prior = sum(score_midpts)/len(score_midpts)
                     criterion1 = len(np.nonzero(score_midpts > param_['thre2'])[0]) > 0.8 * len(score_midpts)
                     criterion2 = score_with_dist_prior > 0
                     if criterion1 and criterion2:
